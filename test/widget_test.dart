@@ -2,8 +2,11 @@ import 'package:ecodescarte/main.dart';
 import 'package:ecodescarte/models/descarte.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() => SharedPreferences.setMockInitialValues({}));
+
   testWidgets('Abre o Início com a lista vazia', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(320, 640);
@@ -11,6 +14,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
 
     await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('EcoDescarte · ODS 12'), findsOneWidget);
     expect(find.text('0 pendentes'), findsOneWidget);
@@ -22,6 +26,7 @@ void main() {
 
   testWidgets('Permite escolher um material e voltar a todos', (tester) async {
     await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
     final filtro = find.byType(DropdownButton<MaterialDescarte>);
 
     await tester.tap(filtro);
@@ -47,6 +52,7 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
 
     await tester.tap(find.text('Adicionar'));
     await tester.pumpAndSettle();
@@ -67,12 +73,13 @@ void main() {
     expect(find.byType(ListTile), findsNothing);
   });
 
-  testWidgets('Adiciona, conclui, reabre e remove um registro', (tester) async {
+  testWidgets('Mantém as alterações da lista ao reabrir o app', (tester) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(320, 680);
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
 
     final filtro = find.byType(DropdownButton<MaterialDescarte>);
     await tester.tap(filtro);
@@ -100,8 +107,20 @@ void main() {
       isNull,
     );
 
+    Future<void> reabrirApp() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(const EcoDescarteApp());
+      await tester.pumpAndSettle();
+    }
+
+    await reabrirApp();
+    expect(nome, findsOneWidget);
+    expect(find.textContaining('Metal · 6 un'), findsOneWidget);
+    expect(find.text('1 pendente'), findsOneWidget);
+
     await tester.tap(find.byTooltip('Marcar como entregue'));
     await tester.pumpAndSettle();
+    await reabrirApp();
     expect(find.text('0 pendentes'), findsOneWidget);
     expect(
       tester.widget<Text>(nome).style?.decoration,
@@ -110,15 +129,40 @@ void main() {
 
     await tester.tap(find.byTooltip('Voltar para pendente'));
     await tester.pumpAndSettle();
+    await reabrirApp();
     expect(find.text('1 pendente'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Opções do descarte'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Remover'));
     await tester.pumpAndSettle();
+    await reabrirApp();
     expect(nome, findsNothing);
     expect(find.text('0 pendentes'), findsOneWidget);
     expect(find.textContaining('Nenhum descarte registrado'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets(
+    'Protege a lista quando a leitura falha e permite tentar de novo',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({'descartes': 'JSON inválido'});
+      await tester.pumpWidget(const EcoDescarteApp());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Não foi possível carregar seus descartes.'),
+        findsOneWidget,
+      );
+      final adicionar = find.widgetWithText(FilledButton, 'Adicionar');
+      expect(tester.widget<FilledButton>(adicionar).onPressed, isNull);
+
+      final preferencias = await SharedPreferences.getInstance();
+      await preferencias.setString('descartes', '[]');
+      await tester.tap(find.text('Tentar novamente'));
+      await tester.pumpAndSettle();
+      expect(find.text('0 pendentes'), findsOneWidget);
+      expect(tester.widget<FilledButton>(adicionar).onPressed, isNotNull);
+    },
+  );
 }

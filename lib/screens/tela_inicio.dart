@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/descarte.dart';
+import '../services/armazenamento.dart';
 import 'formulario_descarte.dart';
 
 class TelaInicio extends StatefulWidget {
@@ -11,9 +12,63 @@ class TelaInicio extends StatefulWidget {
 }
 
 class _TelaInicioState extends State<TelaInicio> {
-  // A lista começa vazia porque cada pessoa registra o que separou.
-  final List<Descarte> _descartes = [];
+  final _armazenamento = Armazenamento();
+  List<Descarte> _descartes = [];
   MaterialDescarte? _materialSelecionado;
+  bool _carregando = true;
+  bool _erroAoCarregar = false;
+  bool _salvando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _carregarDescartes();
+  }
+
+  Future<void> _carregarDescartes() async {
+    setState(() {
+      _carregando = true;
+      _erroAoCarregar = false;
+    });
+
+    try {
+      final descartes = await _armazenamento.carregar();
+      if (!mounted) return;
+
+      setState(() => _descartes = descartes);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _erroAoCarregar = true);
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  Future<bool> _salvarDescartes(List<Descarte> descartes) async {
+    if (_carregando || _erroAoCarregar || _salvando) return false;
+
+    // Uma alteração por vez evita que uma gravação antiga substitua a última.
+    setState(() => _salvando = true);
+    try {
+      await _armazenamento.salvar(descartes);
+      if (!mounted) return false;
+
+      setState(() => _descartes = descartes);
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível salvar a alteração. Tente novamente.',
+          ),
+        ),
+      );
+      return false;
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
 
   Future<void> _adicionarDescarte() async {
     final descarte = await showModalBottomSheet<Descarte>(
@@ -26,32 +81,32 @@ class _TelaInicioState extends State<TelaInicio> {
     );
     if (!mounted || descarte == null) return;
 
-    setState(() {
-      _descartes.insert(0, descarte);
-      // Ao salvar outro material, mostramos o registro que acabou de entrar.
-      if (_materialSelecionado != descarte.material) {
-        _materialSelecionado = null;
-      }
-    });
+    final salvou = await _salvarDescartes([descarte, ..._descartes]);
+    // Se o filtro escondesse o novo registro, voltamos para todos os materiais.
+    if (mounted && salvou && _materialSelecionado != descarte.material) {
+      setState(() => _materialSelecionado = null);
+    }
   }
 
-  void _alternarConclusao(Descarte descarte) {
+  Future<void> _alternarConclusao(Descarte descarte) async {
     final indice = _descartes.indexOf(descarte);
     if (indice == -1) return;
 
-    setState(() {
-      _descartes[indice] = descarte.alternarConclusao(DateTime.now());
-    });
+    final descartes = [..._descartes];
+    descartes[indice] = descarte.alternarConclusao(DateTime.now());
+    await _salvarDescartes(descartes);
   }
 
-  void _removerDescarte(Descarte descarte) {
-    setState(() => _descartes.remove(descarte));
+  Future<void> _removerDescarte(Descarte descarte) async {
+    final descartes = [..._descartes]..remove(descarte);
+    await _salvarDescartes(descartes);
   }
 
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
     final textos = Theme.of(context).textTheme;
+    final podeEditar = !_carregando && !_erroAoCarregar && !_salvando;
     final descartesVisiveis = _materialSelecionado == null
         ? _descartes
         : _descartes.where(
@@ -102,9 +157,11 @@ class _TelaInicioState extends State<TelaInicio> {
                               child: Text(material.nome),
                             ),
                         ],
-                        onChanged: (material) {
-                          setState(() => _materialSelecionado = material);
-                        },
+                        onChanged: _carregando || _erroAoCarregar
+                            ? null
+                            : (material) {
+                                setState(() => _materialSelecionado = material);
+                              },
                       ),
                     ),
                   ),
@@ -125,23 +182,44 @@ class _TelaInicioState extends State<TelaInicio> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        Text(
-                          textoPendentes,
-                          style: textos.labelLarge?.copyWith(
-                            color: cores.primary,
+                        if (!_carregando && !_erroAoCarregar)
+                          Text(
+                            _salvando ? 'Salvando alterações…' : textoPendentes,
+                            style: textos.labelLarge?.copyWith(
+                              color: cores.primary,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     FilledButton.icon(
-                      onPressed: _adicionarDescarte,
+                      onPressed: podeEditar ? _adicionarDescarte : null,
                       icon: const Icon(Icons.add),
                       label: const Text('Adicionar'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                if (descartesVisiveis.isEmpty)
+                if (_carregando)
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        semanticsLabel: 'Carregando descartes',
+                      ),
+                    ),
+                  )
+                else if (_erroAoCarregar)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Não foi possível carregar seus descartes.'),
+                      TextButton(
+                        onPressed: _carregarDescartes,
+                        child: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  )
+                else if (descartesVisiveis.isEmpty)
                   Card(
                     margin: EdgeInsets.zero,
                     color: cores.surfaceContainer,
@@ -171,8 +249,12 @@ class _TelaInicioState extends State<TelaInicio> {
                     _CartaoDescarte(
                       key: ValueKey(descarte.id),
                       descarte: descarte,
-                      aoAlternarConclusao: () => _alternarConclusao(descarte),
-                      aoRemover: () => _removerDescarte(descarte),
+                      aoAlternarConclusao: podeEditar
+                          ? () => _alternarConclusao(descarte)
+                          : null,
+                      aoRemover: podeEditar
+                          ? () => _removerDescarte(descarte)
+                          : null,
                     ),
               ],
             ),
@@ -333,8 +415,8 @@ class _CartaoDescarte extends StatelessWidget {
   });
 
   final Descarte descarte;
-  final VoidCallback aoAlternarConclusao;
-  final VoidCallback aoRemover;
+  final VoidCallback? aoAlternarConclusao;
+  final VoidCallback? aoRemover;
 
   @override
   Widget build(BuildContext context) {
@@ -394,7 +476,7 @@ class _CartaoDescarte extends StatelessWidget {
             ),
             MenuAnchor(
               builder: (context, controlador, child) => IconButton(
-                onPressed: controlador.open,
+                onPressed: aoRemover == null ? null : controlador.open,
                 tooltip: 'Opções do descarte',
                 icon: const Icon(Icons.more_vert),
               ),
