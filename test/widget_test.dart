@@ -131,12 +131,20 @@ void main() {
     await tocarAcao('Marcar como entregue');
     await reabrirApp();
     expect(find.text('0 pendentes'), findsOneWidget);
+    await tester.tap(find.text('Impacto'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 de 5 entregas'), findsOneWidget);
+    await tester.tap(find.text('Início'));
+    await tester.pumpAndSettle();
     expect(
       tester.widget<Text>(nome).style?.decoration,
       TextDecoration.lineThrough,
     );
 
     await tocarAcao('Voltar para pendente');
+    await tester.tap(find.text('Impacto'));
+    await tester.pumpAndSettle();
+    expect(find.text('0 de 5 entregas'), findsOneWidget);
     await reabrirApp();
     expect(find.text('1 pendente'), findsOneWidget);
 

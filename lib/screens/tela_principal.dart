@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../models/descarte.dart';
+import '../services/armazenamento.dart';
+import 'tela_impacto.dart';
 import 'tela_inicio.dart';
 import 'tela_pontos.dart';
 
@@ -12,6 +15,72 @@ class TelaPrincipal extends StatefulWidget {
 
 class _TelaPrincipalState extends State<TelaPrincipal> {
   int _abaSelecionada = 0;
+  late final AppLifecycleListener _cicloDoApp;
+  // Início e Impacto usam a mesma lista já carregada do aparelho.
+  final _armazenamento = Armazenamento();
+  List<Descarte> _descartes = [];
+  bool _carregando = true;
+  bool _erroAoCarregar = false;
+  bool _salvando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ao voltar para o app, a semana pode ter mudado.
+    _cicloDoApp = AppLifecycleListener(onResume: () => setState(() {}));
+    _carregarDescartes();
+  }
+
+  @override
+  void dispose() {
+    _cicloDoApp.dispose();
+    super.dispose();
+  }
+
+  Future<void> _carregarDescartes() async {
+    setState(() {
+      _carregando = true;
+      _erroAoCarregar = false;
+    });
+
+    try {
+      final descartes = await _armazenamento.carregar();
+      if (!mounted) return;
+
+      setState(() => _descartes = descartes);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _erroAoCarregar = true);
+    } finally {
+      if (mounted) setState(() => _carregando = false);
+    }
+  }
+
+  Future<bool> _salvarDescartes(List<Descarte> descartes) async {
+    if (_carregando || _erroAoCarregar || _salvando) return false;
+
+    // Uma alteração por vez evita que uma gravação antiga substitua a última.
+    setState(() => _salvando = true);
+    try {
+      await _armazenamento.salvar(descartes);
+      if (!mounted) return false;
+
+      setState(() => _descartes = descartes);
+      return true;
+    } catch (_) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Não foi possível salvar a alteração. Tente novamente.',
+          ),
+        ),
+      );
+      return false;
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +96,23 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
           // Ao trocar de aba, o filtro e a lista do Início continuam na memória.
           child: IndexedStack(
             index: _abaSelecionada,
-            children: const [TelaInicio(), TelaPontos()],
+            children: [
+              TelaInicio(
+                descartes: _descartes,
+                carregando: _carregando,
+                erroAoCarregar: _erroAoCarregar,
+                salvando: _salvando,
+                aoRecarregar: _carregarDescartes,
+                aoSalvar: _salvarDescartes,
+              ),
+              const TelaPontos(),
+              TelaImpacto(
+                descartes: _descartes,
+                carregando: _carregando,
+                erroAoCarregar: _erroAoCarregar,
+                aoRecarregar: _carregarDescartes,
+              ),
+            ],
           ),
         ),
         bottomNavigationBar: NavigationBar(
@@ -43,6 +128,11 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
               icon: Icon(Icons.location_on_outlined),
               selectedIcon: Icon(Icons.location_on),
               label: 'Pontos',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.insights_outlined),
+              selectedIcon: Icon(Icons.insights),
+              label: 'Impacto',
             ),
           ],
         ),
