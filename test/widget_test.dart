@@ -1,30 +1,45 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
-
 import 'package:ecodescarte/main.dart';
+import 'package:ecodescarte/models/descarte.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Abre o Início com a lista vazia', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 640);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(const EcoDescarte());
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    expect(find.text('EcoDescarte · ODS 12'), findsOneWidget);
+    expect(find.text('0 pendentes'), findsOneWidget);
+    expect(find.textContaining('Nenhum descarte registrado'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Adicionar'), findsOneWidget);
+    expect(find.byType(ListTile), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('Permite escolher um material e voltar a todos', (tester) async {
+    await tester.pumpWidget(const EcoDescarte());
+    final filtro = find.byType(DropdownButton<MaterialDescarte>);
+
+    await tester.tap(filtro);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pilhas').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DropdownButton<MaterialDescarte>>(filtro).value,
+      MaterialDescarte.pilhas,
+    );
+
+    await tester.tap(filtro);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Todos os materiais').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DropdownButton<MaterialDescarte>>(filtro).value,
+      isNull,
+    );
   });
 }
