@@ -28,6 +28,7 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
     super.initState();
     // Ao voltar para o app, a semana pode ter mudado.
     _cicloDoApp = AppLifecycleListener(onResume: () => setState(() {}));
+    // Buscamos os descartes salvos assim que o app abre.
     _carregarDescartes();
   }
 
@@ -59,12 +60,13 @@ class _TelaPrincipalState extends State<TelaPrincipal> {
   Future<bool> _salvarDescartes(List<Descarte> descartes) async {
     if (_carregando || _erroAoCarregar || _salvando) return false;
 
-    // Uma alteração por vez evita que uma gravação antiga substitua a última.
+    // Esperamos uma gravação terminar antes de aceitar outra.
     setState(() => _salvando = true);
     try {
       await _armazenamento.salvar(descartes);
       if (!mounted) return false;
 
+      // A tela só mostra a mudança depois que a lista é salva.
       setState(() => _descartes = descartes);
       return true;
     } catch (_) {

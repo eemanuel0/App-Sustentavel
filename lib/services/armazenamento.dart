@@ -12,9 +12,10 @@ class Armazenamento {
     await preferencias.reload();
     final texto = preferencias.getString(_chaveDescartes);
 
-    // Na primeira abertura ainda não existe uma lista salva.
+    // Se ainda não houver uma lista salva, começamos com a lista vazia.
     if (texto == null) return [];
 
+    // Lemos o texto salvo e montamos de novo cada descarte.
     final registros = jsonDecode(texto) as List<Object?>;
     return [
       for (final registro in registros)
@@ -25,7 +26,7 @@ class Armazenamento {
   Future<void> salvar(List<Descarte> descartes) async {
     final preferencias = await SharedPreferences.getInstance();
 
-    // Guardamos a lista inteira como texto JSON, com as datas de cada descarte.
+    // Salvamos a lista toda como texto JSON para manter os dados de cada item.
     final texto = jsonEncode([
       for (final descarte in descartes) descarte.paraJson(),
     ]);
