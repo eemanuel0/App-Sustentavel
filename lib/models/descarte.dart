@@ -19,18 +19,29 @@ class Descarte {
     required this.nome,
     required this.material,
     required this.quantidade,
-    required this.registradoEm,
-    this.entregueEm,
+    required this.dataCadastro,
+    this.dataConclusao,
   });
 
   final String id;
   final String nome;
   final MaterialDescarte material;
   final int quantidade;
-  final DateTime registradoEm;
+  final DateTime dataCadastro;
 
-  // A data de entrega é a que vai contar para a meta da semana.
-  final DateTime? entregueEm;
+  // A data serve para saber se o descarte foi entregue e em qual semana.
+  final DateTime? dataConclusao;
 
-  bool get entregue => entregueEm != null;
+  bool get concluido => dataConclusao != null;
+
+  Descarte alternarConclusao(DateTime agora) {
+    return Descarte(
+      id: id,
+      nome: nome,
+      material: material,
+      quantidade: quantidade,
+      dataCadastro: dataCadastro,
+      dataConclusao: concluido ? null : agora,
+    );
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/descarte.dart';
+import 'formulario_descarte.dart';
 
 class TelaInicio extends StatefulWidget {
   const TelaInicio({super.key});
@@ -14,6 +15,39 @@ class _TelaInicioState extends State<TelaInicio> {
   final List<Descarte> _descartes = [];
   MaterialDescarte? _materialSelecionado;
 
+  Future<void> _adicionarDescarte() async {
+    final descarte = await showModalBottomSheet<Descarte>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) =>
+          FormularioDescarte(materialInicial: _materialSelecionado),
+    );
+    if (!mounted || descarte == null) return;
+
+    setState(() {
+      _descartes.insert(0, descarte);
+      // Ao salvar outro material, mostramos o registro que acabou de entrar.
+      if (_materialSelecionado != descarte.material) {
+        _materialSelecionado = null;
+      }
+    });
+  }
+
+  void _alternarConclusao(Descarte descarte) {
+    final indice = _descartes.indexOf(descarte);
+    if (indice == -1) return;
+
+    setState(() {
+      _descartes[indice] = descarte.alternarConclusao(DateTime.now());
+    });
+  }
+
+  void _removerDescarte(Descarte descarte) {
+    setState(() => _descartes.remove(descarte));
+  }
+
   @override
   Widget build(BuildContext context) {
     final cores = Theme.of(context).colorScheme;
@@ -23,7 +57,9 @@ class _TelaInicioState extends State<TelaInicio> {
         : _descartes.where(
             (descarte) => descarte.material == _materialSelecionado,
           );
-    final pendentes = _descartes.where((descarte) => !descarte.entregue).length;
+    final pendentes = _descartes
+        .where((descarte) => !descarte.concluido)
+        .length;
     final textoPendentes = pendentes == 1
         ? '1 pendente'
         : '$pendentes pendentes';
@@ -98,7 +134,7 @@ class _TelaInicioState extends State<TelaInicio> {
                       ],
                     ),
                     FilledButton.icon(
-                      onPressed: null,
+                      onPressed: _adicionarDescarte,
                       icon: const Icon(Icons.add),
                       label: const Text('Adicionar'),
                     ),
@@ -132,7 +168,12 @@ class _TelaInicioState extends State<TelaInicio> {
                   )
                 else
                   for (final descarte in descartesVisiveis)
-                    _CartaoDescarte(descarte: descarte),
+                    _CartaoDescarte(
+                      key: ValueKey(descarte.id),
+                      descarte: descarte,
+                      aoAlternarConclusao: () => _alternarConclusao(descarte),
+                      aoRemover: () => _removerDescarte(descarte),
+                    ),
               ],
             ),
           ),
@@ -284,9 +325,16 @@ class _BannerReciclagem extends StatelessWidget {
 }
 
 class _CartaoDescarte extends StatelessWidget {
-  const _CartaoDescarte({required this.descarte});
+  const _CartaoDescarte({
+    super.key,
+    required this.descarte,
+    required this.aoAlternarConclusao,
+    required this.aoRemover,
+  });
 
   final Descarte descarte;
+  final VoidCallback aoAlternarConclusao;
+  final VoidCallback aoRemover;
 
   @override
   Widget build(BuildContext context) {
@@ -307,7 +355,7 @@ class _CartaoDescarte extends StatelessWidget {
       MaterialDescarte.eletronicos => (Icons.devices, Colors.cyanAccent),
       MaterialDescarte.outros => (Icons.delete_outline, cores.onSurfaceVariant),
     };
-    final data = descarte.registradoEm.toLocal();
+    final data = descarte.dataCadastro.toLocal();
     final dia = data.day.toString().padLeft(2, '0');
     final mes = data.month.toString().padLeft(2, '0');
 
@@ -322,17 +370,43 @@ class _CartaoDescarte extends StatelessWidget {
         ),
         title: Text(
           descarte.nome,
-          style: descarte.entregue
+          style: descarte.concluido
               ? const TextStyle(decoration: TextDecoration.lineThrough)
               : null,
         ),
         subtitle: Text(
           '${descarte.material.nome} · ${descarte.quantidade} un · Reg. $dia/$mes',
         ),
-        trailing: Icon(
-          descarte.entregue ? Icons.check_circle : Icons.circle_outlined,
-          color: descarte.entregue ? cores.primary : cores.onSurfaceVariant,
-          semanticLabel: descarte.entregue ? 'Entregue' : 'Pendente',
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              onPressed: aoAlternarConclusao,
+              tooltip: descarte.concluido
+                  ? 'Voltar para pendente'
+                  : 'Marcar como entregue',
+              icon: Icon(
+                descarte.concluido ? Icons.check_circle : Icons.circle_outlined,
+                color: descarte.concluido
+                    ? cores.primary
+                    : cores.onSurfaceVariant,
+              ),
+            ),
+            MenuAnchor(
+              builder: (context, controlador, child) => IconButton(
+                onPressed: controlador.open,
+                tooltip: 'Opções do descarte',
+                icon: const Icon(Icons.more_vert),
+              ),
+              menuChildren: [
+                MenuItemButton(
+                  onPressed: aoRemover,
+                  leadingIcon: const Icon(Icons.delete_outline),
+                  child: const Text('Remover'),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
