@@ -54,6 +54,7 @@ class _TelaInicioState extends State<TelaInicio> {
                         hint: const Text('Todos os materiais'),
                         icon: const Icon(Icons.keyboard_arrow_down),
                         isExpanded: true,
+                        dropdownColor: cores.surfaceContainer,
                         borderRadius: BorderRadius.circular(14),
                         items: [
                           const DropdownMenuItem(
@@ -200,10 +201,10 @@ class _BannerReciclagem extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(25),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF161F18), Color(0xFF101711)],
+          colors: [cores.secondary, cores.surface],
         ),
       ),
       child: Row(

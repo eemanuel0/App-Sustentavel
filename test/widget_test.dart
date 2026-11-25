@@ -10,7 +10,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     addTearDown(tester.view.resetPhysicalSize);
 
-    await tester.pumpWidget(const EcoDescarte());
+    await tester.pumpWidget(const EcoDescarteApp());
 
     expect(find.text('EcoDescarte · ODS 12'), findsOneWidget);
     expect(find.text('0 pendentes'), findsOneWidget);
@@ -21,7 +21,7 @@ void main() {
   });
 
   testWidgets('Permite escolher um material e voltar a todos', (tester) async {
-    await tester.pumpWidget(const EcoDescarte());
+    await tester.pumpWidget(const EcoDescarteApp());
     final filtro = find.byType(DropdownButton<MaterialDescarte>);
 
     await tester.tap(filtro);
