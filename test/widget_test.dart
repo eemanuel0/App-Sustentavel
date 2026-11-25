@@ -18,8 +18,10 @@ void main() {
 
     expect(find.text('EcoDescarte · ODS 12'), findsOneWidget);
     expect(find.text('0 pendentes'), findsOneWidget);
-    expect(find.textContaining('Nenhum descarte registrado'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Adicionar'), findsOneWidget);
+    final mensagem = find.textContaining('Nenhum descarte registrado');
+    await tester.scrollUntilVisible(mensagem, 120);
+    expect(mensagem, findsOneWidget);
     expect(find.byType(ListTile), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -113,13 +115,20 @@ void main() {
       await tester.pumpAndSettle();
     }
 
+    Future<void> tocarAcao(String rotulo) async {
+      final acao = find.byTooltip(rotulo).hitTestable();
+      await tester.scrollUntilVisible(acao, 120);
+      await tester.pumpAndSettle();
+      await tester.tap(acao);
+      await tester.pumpAndSettle();
+    }
+
     await reabrirApp();
     expect(nome, findsOneWidget);
     expect(find.textContaining('Metal · 6 un'), findsOneWidget);
     expect(find.text('1 pendente'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Marcar como entregue'));
-    await tester.pumpAndSettle();
+    await tocarAcao('Marcar como entregue');
     await reabrirApp();
     expect(find.text('0 pendentes'), findsOneWidget);
     expect(
@@ -127,19 +136,19 @@ void main() {
       TextDecoration.lineThrough,
     );
 
-    await tester.tap(find.byTooltip('Voltar para pendente'));
-    await tester.pumpAndSettle();
+    await tocarAcao('Voltar para pendente');
     await reabrirApp();
     expect(find.text('1 pendente'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Opções do descarte'));
-    await tester.pumpAndSettle();
+    await tocarAcao('Opções do descarte');
     await tester.tap(find.text('Remover'));
     await tester.pumpAndSettle();
     await reabrirApp();
     expect(nome, findsNothing);
     expect(find.text('0 pendentes'), findsOneWidget);
-    expect(find.textContaining('Nenhum descarte registrado'), findsOneWidget);
+    final mensagem = find.textContaining('Nenhum descarte registrado');
+    await tester.scrollUntilVisible(mensagem, 120);
+    expect(mensagem, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -165,4 +174,50 @@ void main() {
       expect(tester.widget<FilledButton>(adicionar).onPressed, isNotNull);
     },
   );
+
+  testWidgets('Navega para Pontos e filtra os locais por material', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
+
+    final filtroInicio = find.byType(DropdownButton<MaterialDescarte>);
+    await tester.tap(filtroInicio);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pilhas').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Pontos'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pontos de coleta'), findsOneWidget);
+    expect(find.text('Vitória da Conquista · BA'), findsOneWidget);
+    expect(find.text('3 pontos de coleta'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Óleo'));
+    await tester.pumpAndSettle();
+    expect(find.text('1 ponto de coleta'), findsOneWidget);
+    expect(find.text('Ecoponto Vila América'), findsOneWidget);
+    expect(find.text('Ecoponto Boulevard Shopping'), findsNothing);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Todos'));
+    await tester.pumpAndSettle();
+    expect(find.text('3 pontos de coleta'), findsOneWidget);
+
+    final shopping = find.text('Ecoponto Boulevard Shopping');
+    await tester.scrollUntilVisible(shopping, 200);
+    expect(shopping, findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.text('Minha lista'), findsOneWidget);
+    expect(
+      tester.widget<DropdownButton<MaterialDescarte>>(filtroInicio).value,
+      MaterialDescarte.pilhas,
+    );
+    expect(tester.takeException(), isNull);
+  });
 }

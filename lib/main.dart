@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'screens/tela_inicio.dart';
+import 'screens/tela_principal.dart';
 
 void main() {
   runApp(const EcoDescarteApp());
@@ -93,7 +93,7 @@ class EcoDescarteApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const TelaInicio(),
+      home: const TelaPrincipal(),
     );
   }
 }

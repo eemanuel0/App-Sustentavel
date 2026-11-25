@@ -119,146 +119,138 @@ class _TelaInicioState extends State<TelaInicio> {
         ? '1 pendente'
         : '$pendentes pendentes';
 
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 560),
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-              children: [
-                const _Cabecalho(),
-                const SizedBox(height: 22),
-                const _BannerReciclagem(),
-                const SizedBox(height: 22),
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: cores.surfaceContainer,
-                    border: Border.all(color: cores.outlineVariant),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: ListView(
+          primary: false,
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
+          children: [
+            const _Cabecalho(),
+            const SizedBox(height: 22),
+            const _BannerReciclagem(),
+            const SizedBox(height: 22),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: cores.surfaceContainer,
+                border: Border.all(color: cores.outlineVariant),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<MaterialDescarte>(
+                    value: _materialSelecionado,
+                    hint: const Text('Todos os materiais'),
+                    icon: const Icon(Icons.keyboard_arrow_down),
+                    isExpanded: true,
+                    dropdownColor: cores.surfaceContainer,
                     borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<MaterialDescarte>(
-                        value: _materialSelecionado,
-                        hint: const Text('Todos os materiais'),
-                        icon: const Icon(Icons.keyboard_arrow_down),
-                        isExpanded: true,
-                        dropdownColor: cores.surfaceContainer,
-                        borderRadius: BorderRadius.circular(14),
-                        items: [
-                          const DropdownMenuItem(
-                            child: Text('Todos os materiais'),
-                          ),
-                          for (final material in MaterialDescarte.values)
-                            DropdownMenuItem(
-                              value: material,
-                              child: Text(material.nome),
-                            ),
-                        ],
-                        onChanged: _carregando || _erroAoCarregar
-                            ? null
-                            : (material) {
-                                setState(() => _materialSelecionado = material);
-                              },
-                      ),
-                    ),
+                    items: [
+                      const DropdownMenuItem(child: Text('Todos os materiais')),
+                      for (final material in MaterialDescarte.values)
+                        DropdownMenuItem(
+                          value: material,
+                          child: Text(material.nome),
+                        ),
+                    ],
+                    onChanged: _carregando || _erroAoCarregar
+                        ? null
+                        : (material) {
+                            setState(() => _materialSelecionado = material);
+                          },
                   ),
                 ),
-                const SizedBox(height: 24),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 12,
-                  runSpacing: 10,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 12,
+              runSpacing: 10,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Minha lista',
-                          style: textos.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+                    Text(
+                      'Minha lista',
+                      style: textos.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (!_carregando && !_erroAoCarregar)
+                      Text(
+                        _salvando ? 'Salvando alterações…' : textoPendentes,
+                        style: textos.labelLarge?.copyWith(
+                          color: cores.primary,
                         ),
-                        if (!_carregando && !_erroAoCarregar)
-                          Text(
-                            _salvando ? 'Salvando alterações…' : textoPendentes,
-                            style: textos.labelLarge?.copyWith(
-                              color: cores.primary,
-                            ),
-                          ),
-                      ],
-                    ),
-                    FilledButton.icon(
-                      onPressed: podeEditar ? _adicionarDescarte : null,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Adicionar'),
-                    ),
+                      ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                if (_carregando)
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(
-                      child: CircularProgressIndicator(
-                        semanticsLabel: 'Carregando descartes',
-                      ),
-                    ),
-                  )
-                else if (_erroAoCarregar)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Não foi possível carregar seus descartes.'),
-                      TextButton(
-                        onPressed: _carregarDescartes,
-                        child: const Text('Tentar novamente'),
-                      ),
-                    ],
-                  )
-                else if (descartesVisiveis.isEmpty)
-                  Card(
-                    margin: EdgeInsets.zero,
-                    color: cores.surfaceContainer,
-                    child: Padding(
-                      padding: const EdgeInsets.all(18),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.inventory_2_outlined,
-                            color: cores.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              _descartes.isEmpty
-                                  ? 'Nenhum descarte registrado. Adicione o que você já separou.'
-                                  : 'Nenhum descarte deste material.',
-                              style: textos.bodyMedium,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                else
-                  for (final descarte in descartesVisiveis)
-                    _CartaoDescarte(
-                      key: ValueKey(descarte.id),
-                      descarte: descarte,
-                      aoAlternarConclusao: podeEditar
-                          ? () => _alternarConclusao(descarte)
-                          : null,
-                      aoRemover: podeEditar
-                          ? () => _removerDescarte(descarte)
-                          : null,
-                    ),
+                FilledButton.icon(
+                  onPressed: podeEditar ? _adicionarDescarte : null,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Adicionar'),
+                ),
               ],
             ),
-          ),
+            const SizedBox(height: 12),
+            if (_carregando)
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(
+                  child: CircularProgressIndicator(
+                    semanticsLabel: 'Carregando descartes',
+                  ),
+                ),
+              )
+            else if (_erroAoCarregar)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Não foi possível carregar seus descartes.'),
+                  TextButton(
+                    onPressed: _carregarDescartes,
+                    child: const Text('Tentar novamente'),
+                  ),
+                ],
+              )
+            else if (descartesVisiveis.isEmpty)
+              Card(
+                margin: EdgeInsets.zero,
+                color: cores.surfaceContainer,
+                child: Padding(
+                  padding: const EdgeInsets.all(18),
+                  child: Row(
+                    children: [
+                      Icon(Icons.inventory_2_outlined, color: cores.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          _descartes.isEmpty
+                              ? 'Nenhum descarte registrado. Adicione o que você já separou.'
+                              : 'Nenhum descarte deste material.',
+                          style: textos.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            else
+              for (final descarte in descartesVisiveis)
+                _CartaoDescarte(
+                  key: ValueKey(descarte.id),
+                  descarte: descarte,
+                  aoAlternarConclusao: podeEditar
+                      ? () => _alternarConclusao(descarte)
+                      : null,
+                  aoRemover: podeEditar
+                      ? () => _removerDescarte(descarte)
+                      : null,
+                ),
+          ],
         ),
       ),
     );
