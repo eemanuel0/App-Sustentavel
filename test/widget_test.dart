@@ -1,30 +1,168 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter_test/flutter_test.dart';
-import 'package:material_ui/material_ui.dart';
-
 import 'package:ecodescarte/main.dart';
+import 'package:ecodescarte/models/descarte.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  setUp(() => SharedPreferences.setMockInitialValues({}));
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  testWidgets('Abre o Início com a lista vazia', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 640);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('EcoDescarte · ODS 12'), findsOneWidget);
+    expect(find.text('0 pendentes'), findsOneWidget);
+    expect(find.textContaining('Nenhum descarte registrado'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, 'Adicionar'), findsOneWidget);
+    expect(find.byType(ListTile), findsNothing);
+    expect(tester.takeException(), isNull);
   });
+
+  testWidgets('Permite escolher um material e voltar a todos', (tester) async {
+    await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
+    final filtro = find.byType(DropdownButton<MaterialDescarte>);
+
+    await tester.tap(filtro);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pilhas').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DropdownButton<MaterialDescarte>>(filtro).value,
+      MaterialDescarte.pilhas,
+    );
+
+    await tester.tap(filtro);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Todos os materiais').last);
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<DropdownButton<MaterialDescarte>>(filtro).value,
+      isNull,
+    );
+  });
+
+  testWidgets('Valida os campos antes de cadastrar um descarte', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Adicionar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).last, '0');
+    await tester.tap(find.text('Salvar descarte'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Informe o nome do descarte.'), findsOneWidget);
+    expect(find.text('Escolha um material.'), findsOneWidget);
+    expect(
+      find.text('Informe um número inteiro maior que zero.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    expect(find.text('0 pendentes'), findsOneWidget);
+    expect(find.byType(ListTile), findsNothing);
+  });
+
+  testWidgets('Mantém as alterações da lista ao reabrir o app', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(320, 680);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(const EcoDescarteApp());
+    await tester.pumpAndSettle();
+
+    final filtro = find.byType(DropdownButton<MaterialDescarte>);
+    await tester.tap(filtro);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Papel').last);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Adicionar'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextFormField).first, 'Latinhas');
+    await tester.enterText(find.byType(TextFormField).last, '6');
+    await tester.tap(find.byType(DropdownButtonFormField<MaterialDescarte>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Metal').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Salvar descarte'));
+    await tester.pumpAndSettle();
+
+    final nome = find.text('Latinhas');
+    expect(nome, findsOneWidget);
+    expect(find.textContaining('Metal · 6 un'), findsOneWidget);
+    expect(find.text('1 pendente'), findsOneWidget);
+    expect(
+      tester.widget<DropdownButton<MaterialDescarte>>(filtro).value,
+      isNull,
+    );
+
+    Future<void> reabrirApp() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpWidget(const EcoDescarteApp());
+      await tester.pumpAndSettle();
+    }
+
+    await reabrirApp();
+    expect(nome, findsOneWidget);
+    expect(find.textContaining('Metal · 6 un'), findsOneWidget);
+    expect(find.text('1 pendente'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Marcar como entregue'));
+    await tester.pumpAndSettle();
+    await reabrirApp();
+    expect(find.text('0 pendentes'), findsOneWidget);
+    expect(
+      tester.widget<Text>(nome).style?.decoration,
+      TextDecoration.lineThrough,
+    );
+
+    await tester.tap(find.byTooltip('Voltar para pendente'));
+    await tester.pumpAndSettle();
+    await reabrirApp();
+    expect(find.text('1 pendente'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Opções do descarte'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Remover'));
+    await tester.pumpAndSettle();
+    await reabrirApp();
+    expect(nome, findsNothing);
+    expect(find.text('0 pendentes'), findsOneWidget);
+    expect(find.textContaining('Nenhum descarte registrado'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Protege a lista quando a leitura falha e permite tentar de novo',
+    (tester) async {
+      SharedPreferences.setMockInitialValues({'descartes': 'JSON inválido'});
+      await tester.pumpWidget(const EcoDescarteApp());
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Não foi possível carregar seus descartes.'),
+        findsOneWidget,
+      );
+      final adicionar = find.widgetWithText(FilledButton, 'Adicionar');
+      expect(tester.widget<FilledButton>(adicionar).onPressed, isNull);
+
+      final preferencias = await SharedPreferences.getInstance();
+      await preferencias.setString('descartes', '[]');
+      await tester.tap(find.text('Tentar novamente'));
+      await tester.pumpAndSettle();
+      expect(find.text('0 pendentes'), findsOneWidget);
+      expect(tester.widget<FilledButton>(adicionar).onPressed, isNotNull);
+    },
+  );
 }
